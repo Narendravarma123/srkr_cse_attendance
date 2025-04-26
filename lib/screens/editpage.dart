@@ -30,6 +30,7 @@ class _Edit_PageState extends State<Edit_Page> {
   String? Section;
   List<dynamic>? Absent_list1;
   List<dynamic> roll_no = [];
+  List<dynamic>? dup_list;
   String? Date;
   List<dynamic> presentees = [];
   void SetValues() async{
@@ -39,6 +40,7 @@ class _Edit_PageState extends State<Edit_Page> {
     time_slot=widget.time_slot;
     Section=widget.Section;
     Absent_list1 = widget.Absent_list;
+    dup_list = List.from(widget.Absent_list);
     Date = widget.Date;
     presentees = widget.presentees;
 
@@ -327,7 +329,52 @@ class _Edit_PageState extends State<Edit_Page> {
                           if (UserquerySnapshot.docs.isNotEmpty) {
                             DocumentSnapshot doc = UserquerySnapshot.docs.first;
                             DocumentReference docRef = doc.reference;
+                            print(doc.data());
+                          // Extract course and entities
+                          final docData = doc.data() as Map<String, dynamic>;
+                          String courseName = docData['Course_name'];
+                          int entities = docData['Entities'];
                             await docRef.update({'Absentees': Absent_list1,'edited':true});
+                            Set<dynamic> originalSet = Set.from(dup_list!);
+                            Set<dynamic> updatedSet = Set.from(Absent_list1!);
+      print("ooo");                      final studentCollection = FirebaseFirestore.instance.collection("student_data_fire");
+  print(originalSet);
+  print("uuuu");
+  print(updatedSet);
+
+                              Set<dynamic> removedRolls = originalSet.difference(updatedSet);
+                              print("removedRolls");
+                              print(removedRolls);
+                              // For removed rolls → subtract entities
+                              for (var roll in removedRolls) {
+                                DocumentReference docRef = studentCollection.doc(roll);
+                                print("docRef");
+                                print(docRef);
+
+                                DocumentSnapshot docSnap = await docRef.get();
+                                print(docRef.get());
+                                print(docSnap);
+                                if (docSnap.exists) {
+                                  Map<String, dynamic> data = docSnap.data() as Map<String, dynamic>;
+                                  int current = data[courseName] ?? 0;
+                                  int newVal = (current - entities).clamp(0, current); // prevent negative values
+                                  await docRef.update({courseName: newVal});
+                                }
+                              }
+                              Set<dynamic> addedRolls = updatedSet.difference(originalSet);
+// For added rolls → add entities
+                              for (var roll in addedRolls) {
+                                DocumentReference docRef = studentCollection.doc(roll);
+                                DocumentSnapshot docSnap = await docRef.get();
+                                if (docSnap.exists) {
+                                  Map<String, dynamic> data = docSnap.data() as Map<String, dynamic>;
+                                  int current = data[courseName] ?? 0;
+                                  await docRef.update({courseName: current + entities});
+                                } else {
+                                  await docRef.set({courseName: entities});
+                                }
+                              }
+
                           }
                           else{
                             print("error");

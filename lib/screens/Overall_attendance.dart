@@ -122,139 +122,295 @@ class _AttendanceCalState extends State<AttendanceCal> {
     }
   }
   late Future<List<Datawidget>> lis = Future.value([]);
-  Future<List<Datawidget>> gettingClassList(String deptValue,String YearValue,String sectionvalue) async {
+  Future<List<Datawidget>> gettingClassList(String deptValue, String yearValue, String sectionValue) async {
     List<dynamic> rollNumber = [];
     Map<String, dynamic> full_data = {};
-    int len=0;
-    int totalclassesAttended=0;
-    int attended=0;
-    int? total_classes_completed=0;
+    int totalclassesAttended = 0;
+    int? total_classes_completed = 0;
     double total_percentage = 0;
-      final messages = await _firestore.collection('Full_Data').get();
-      for (var message in messages.docs) {
-        if(!isFlag){
-          break;
-        }
-        var data = message.data();
-        if(data.containsKey(deptvalue) && data[deptvalue].containsKey(yearvalue)){
-          setState(() {
-            full_data=data;
-            class_list = [];
-            class_list = class_list+ data[deptvalue][yearvalue]['classes'];
-            PdfHeader.clear();
-            PdfHeader.add("Roll Numbers");
-            PdfHeader = PdfHeader+class_list;
-            PdfHeader.add("T.A");
-            PdfHeader.add("T.C");
-            PdfHeader.add("Total %");
-          });
-          rollNumber = rollNumber+ data[deptvalue][yearvalue][sectionvalue]['roll_numbers'];
-          break;
-        }
-        else{
-          continue;
-        }
-      }
-      Map<String, dynamic> courses_details = full_data[deptvalue][yearvalue][sectionvalue]['courses_count'];
-      List<Datawidget> messageWidgets = [];
-      String AbyCpercentageString ='';
-      for(var j in class_list){
-        if(!isFlag){
-          break;
-        }
-        total_classes_completed = (total_classes_completed!+courses_details[j]['count']) as int?;
-      }
-      for(var rolls in rollNumber){
-        if(!isFlag){
-          break;
-        }
-        List<String> AbyClist = [];
-        List<String> Percentage = [];
-        List<dynamic> StudentStat = [];
-        List<String> AbyCwithPercentage = [];
-        print(rolls);
-        for(var j in class_list){
-          len=0;
-          if(!isFlag){
-            break;
-          }
-          QuerySnapshot querySnapshot = await _firestore.collection('Absent_data')
-              .where('Department', isEqualTo: deptvalue)
-              .where('Year',isEqualTo: yearvalue)
-              .where('Section',isEqualTo: sectionvalue)
-              .where('Course_name',isEqualTo: j)
-              .where('Entities',whereIn: [1, 2, 4])
-              .where('Academic_year',isEqualTo:fetched_Academic_year)
-              .where('Absentees', arrayContains: rolls)
-              .get();
-          for (var doc in querySnapshot.docs) {
-            // Get the entity value for this document
-            int entityValue = doc['Entities'];
 
-            // Update the length based on the entity value
-            if (entityValue == 1) {
-              len += 1;  // Add 1 to len for entity 1
-            } else if (entityValue == 2) {
-              len += 2;  // Add 2 to len for entity 2
-            } else if (entityValue == 4) {
-              len += 4;  // Add 4 to len for entity 4
-            }
-          }
-          attended = courses_details[j]['count']-len;
-          totalclassesAttended = totalclassesAttended+attended;
+    // Fetch class list and roll numbers
+    final messages = await _firestore.collection('Full_Data').get();
+    for (var message in messages.docs) {
+      if (!isFlag) break;
+
+      var data = message.data();
+      if (data.containsKey(deptValue) && data[deptValue].containsKey(yearValue)) {
+        setState(() {
+          full_data = data;
+          class_list = [];
+          class_list = class_list + data[deptValue][yearValue]['classes'];
+          PdfHeader.clear();
+          PdfHeader.add("Roll Numbers");
+          PdfHeader = PdfHeader + class_list;
+          PdfHeader.add("T.A");
+          PdfHeader.add("T.C");
+          PdfHeader.add("Total %");
+        });
+        rollNumber = rollNumber + data[deptValue][yearValue][sectionValue]['roll_numbers'];
+        break;
+      }
+    }
+
+    Map<String, dynamic> courses_details = full_data[deptValue][yearValue][sectionValue]['courses_count'];
+    List<Datawidget> messageWidgets = [];
+    String AbyCpercentageString = '';
+
+    // Calculate total classes completed
+    for (var j in class_list) {
+      if (!isFlag) break;
+      total_classes_completed = (total_classes_completed! + courses_details[j]['count']) as int?;
+    }
+
+    // Process each roll number
+    for (var rolls in rollNumber) {
+      if (!isFlag) break;
+
+      List<String> AbyClist = [];
+      List<String> Percentage = [];
+      List<dynamic> StudentStat = [];
+      List<String> AbyCwithPercentage = [];
+      totalclassesAttended = 0;
+
+      // Fetch student data from student_data_fire collection
+      DocumentSnapshot studentDoc = await _firestore.collection('student_data_fire').doc(rolls).get();
+
+      if (studentDoc.exists) {
+        Map<String, dynamic> studentData = studentDoc.data() as Map<String, dynamic>;
+
+        // Process each class
+        for (var j in class_list) {
+          if (!isFlag) break;
+
+          int attended = 0;
           int classcount = courses_details[j]['count'];
+
+          // If this course exists in student data, get the absences
+          if (studentData.containsKey(j)) {
+            // The value in student data represents absences, so subtract from total
+            int absences = studentData[j];
+            attended = classcount - absences;
+          } else {
+            // If no data exists for this course, assume full attendance
+            attended = classcount;
+          }
+
+          // Ensure attended doesn't go below 0
+          attended = attended < 0 ? 0 : attended;
+
+          totalclassesAttended += attended;
           String classesAttended = attended.toString();
           String classesStrcount = classcount.toString();
-          String AbyC = classesAttended+"/"+classesStrcount;
+          String AbyC = "$classesAttended/$classesStrcount";
           AbyClist.add(AbyC);
-          if(attended==0 && classcount==0){
+
+          if (attended == 0 && classcount == 0) {
             String AbyCpercentage = '0.0';
             Percentage.add(AbyCpercentage);
-            AbyCpercentageString = AbyC+" ("+AbyCpercentage+"%)";
-          }
-          else{
-            double AbyCpercentage = (attended/classcount)*100;
+            AbyCpercentageString = "$AbyC ($AbyCpercentage%)";
+          } else {
+            double AbyCpercentage = (attended / classcount) * 100;
             String result = AbyCpercentage.toStringAsFixed(2);
             Percentage.add(result);
-            AbyCpercentageString = AbyC+" ("+result+"%)";
+            AbyCpercentageString = "$AbyC ($result%)";
           }
+
           AbyCwithPercentage.add(AbyCpercentageString);
         }
-        if(!isFlag){
-          break;
-        }
-        counter = counter+1;
-        setState(() {
-          loader = counter/(rollNumber.length);
-          percentageloader = (loader*100).toInt();
-        });
-        total_percentage = (totalclassesAttended/total_classes_completed!)*100;
-        String total_percentage_result = total_percentage.toStringAsFixed(2);
-        StudentStat.add(rolls);
-        StudentStat=StudentStat+AbyCwithPercentage;
-        StudentStat.add(totalclassesAttended);
-        StudentStat.add(total_classes_completed);
-        StudentStat.add(total_percentage_result);
-        StudentsData.add(StudentStat);
+      } else {
+        // If student document doesn't exist, assume full attendance for all classes
+        for (var j in class_list) {
+          if (!isFlag) break;
 
-        final studentdet = Datawidget(rolls,class_list,AbyClist,Percentage,totalclassesAttended,total_classes_completed,total_percentage_result);
-        messageWidgets.add(studentdet);
-        totalclassesAttended=0;
+          int classcount = courses_details[j]['count'];
+          int attended = classcount; // Full attendance
 
-        if(rollNumber.length == counter){
-          print(counter);
-          setState(() {
-            isFlag = false;
-          });
-        }
-        else{
-          setState(() {
-            isFlag = true;
-          });
+          totalclassesAttended += attended;
+          String classesAttended = attended.toString();
+          String classesStrcount = classcount.toString();
+          String AbyC = "$classesAttended/$classesStrcount";
+          AbyClist.add(AbyC);
+
+          String result = "100.00";
+          Percentage.add(result);
+          AbyCpercentageString = "$AbyC ($result%)";
+          AbyCwithPercentage.add(AbyCpercentageString);
         }
       }
-      return messageWidgets;
+
+      counter = counter + 1;
+      setState(() {
+        loader = counter / (rollNumber.length);
+        percentageloader = (loader * 100).toInt();
+      });
+
+      total_percentage = (totalclassesAttended / total_classes_completed!) * 100;
+      String total_percentage_result = total_percentage.toStringAsFixed(2);
+
+      StudentStat.add(rolls);
+      StudentStat = StudentStat + AbyCwithPercentage;
+      StudentStat.add(totalclassesAttended);
+      StudentStat.add(total_classes_completed);
+      StudentStat.add(total_percentage_result);
+      StudentsData.add(StudentStat);
+
+      final studentdet = Datawidget(
+          rolls,
+          class_list,
+          AbyClist,
+          Percentage,
+          totalclassesAttended,
+          total_classes_completed,
+          total_percentage_result
+      );
+      messageWidgets.add(studentdet);
+
+      if (rollNumber.length == counter) {
+        setState(() {
+          isFlag = false;
+        });
+      } else {
+        setState(() {
+          isFlag = true;
+        });
+      }
+    }
+
+    return messageWidgets;
   }
+  // Future<List<Datawidget>> gettingClassList(String deptValue,String YearValue,String sectionvalue) async {
+  //   List<dynamic> rollNumber = [];
+  //   Map<String, dynamic> full_data = {};
+  //   int len=0;
+  //   int totalclassesAttended=0;
+  //   int attended=0;
+  //   int? total_classes_completed=0;
+  //   double total_percentage = 0;
+  //     final messages = await _firestore.collection('Full_Data').get();
+  //     for (var message in messages.docs) {
+  //       if(!isFlag){
+  //         break;
+  //       }
+  //       var data = message.data();
+  //       if(data.containsKey(deptvalue) && data[deptvalue].containsKey(yearvalue)){
+  //         setState(() {
+  //           full_data=data;
+  //           class_list = [];
+  //           class_list = class_list+ data[deptvalue][yearvalue]['classes'];
+  //           PdfHeader.clear();
+  //           PdfHeader.add("Roll Numbers");
+  //           PdfHeader = PdfHeader+class_list;
+  //           PdfHeader.add("T.A");
+  //           PdfHeader.add("T.C");
+  //           PdfHeader.add("Total %");
+  //         });
+  //         rollNumber = rollNumber+ data[deptvalue][yearvalue][sectionvalue]['roll_numbers'];
+  //         break;
+  //       }
+  //       else{
+  //         continue;
+  //       }
+  //     }
+  //     Map<String, dynamic> courses_details = full_data[deptvalue][yearvalue][sectionvalue]['courses_count'];
+  //     List<Datawidget> messageWidgets = [];
+  //     String AbyCpercentageString ='';
+  //     for(var j in class_list){
+  //       if(!isFlag){
+  //         break;
+  //       }
+  //       total_classes_completed = (total_classes_completed!+courses_details[j]['count']) as int?;
+  //     }
+  //     for(var rolls in rollNumber){
+  //       if(!isFlag){
+  //         break;
+  //       }
+  //       List<String> AbyClist = [];
+  //       List<String> Percentage = [];
+  //       List<dynamic> StudentStat = [];
+  //       List<String> AbyCwithPercentage = [];
+  //       print(rolls);
+  //       for(var j in class_list){
+  //         len=0;
+  //         if(!isFlag){
+  //           break;
+  //         }
+  //         QuerySnapshot querySnapshot = await _firestore.collection('Absent_data')
+  //             .where('Department', isEqualTo: deptvalue)
+  //             .where('Year',isEqualTo: yearvalue)
+  //             .where('Section',isEqualTo: sectionvalue)
+  //             .where('Course_name',isEqualTo: j)
+  //             .where('Entities',whereIn: [1, 2, 4])
+  //             .where('Academic_year',isEqualTo:fetched_Academic_year)
+  //             .where('Absentees', arrayContains: rolls)
+  //             .get();
+  //         for (var doc in querySnapshot.docs) {
+  //           // Get the entity value for this document
+  //           int entityValue = doc['Entities'];
+  //
+  //           // Update the length based on the entity value
+  //           if (entityValue == 1) {
+  //             len += 1;  // Add 1 to len for entity 1
+  //           } else if (entityValue == 2) {
+  //             len += 2;  // Add 2 to len for entity 2
+  //           } else if (entityValue == 4) {
+  //             len += 4;  // Add 4 to len for entity 4
+  //           }
+  //         }
+  //         attended = courses_details[j]['count']-len;
+  //         totalclassesAttended = totalclassesAttended+attended;
+  //         int classcount = courses_details[j]['count'];
+  //         String classesAttended = attended.toString();
+  //         String classesStrcount = classcount.toString();
+  //         String AbyC = classesAttended+"/"+classesStrcount;
+  //         AbyClist.add(AbyC);
+  //         if(attended==0 && classcount==0){
+  //           String AbyCpercentage = '0.0';
+  //           Percentage.add(AbyCpercentage);
+  //           AbyCpercentageString = AbyC+" ("+AbyCpercentage+"%)";
+  //         }
+  //         else{
+  //           double AbyCpercentage = (attended/classcount)*100;
+  //           String result = AbyCpercentage.toStringAsFixed(2);
+  //           Percentage.add(result);
+  //           AbyCpercentageString = AbyC+" ("+result+"%)";
+  //         }
+  //         AbyCwithPercentage.add(AbyCpercentageString);
+  //       }
+  //       if(!isFlag){
+  //         break;
+  //       }
+  //       counter = counter+1;
+  //       setState(() {
+  //         loader = counter/(rollNumber.length);
+  //         percentageloader = (loader*100).toInt();
+  //       });
+  //       total_percentage = (totalclassesAttended/total_classes_completed!)*100;
+  //       String total_percentage_result = total_percentage.toStringAsFixed(2);
+  //       StudentStat.add(rolls);
+  //       StudentStat=StudentStat+AbyCwithPercentage;
+  //       StudentStat.add(totalclassesAttended);
+  //       StudentStat.add(total_classes_completed);
+  //       StudentStat.add(total_percentage_result);
+  //       StudentsData.add(StudentStat);
+  //
+  //       final studentdet = Datawidget(rolls,class_list,AbyClist,Percentage,totalclassesAttended,total_classes_completed,total_percentage_result);
+  //       messageWidgets.add(studentdet);
+  //       totalclassesAttended=0;
+  //
+  //       if(rollNumber.length == counter){
+  //         print(counter);
+  //         setState(() {
+  //           isFlag = false;
+  //         });
+  //       }
+  //       else{
+  //         setState(() {
+  //           isFlag = true;
+  //         });
+  //       }
+  //     }
+  //     return messageWidgets;
+  // }
   @override
   void initState() {
     curr = _auth.currentUser!.email!;

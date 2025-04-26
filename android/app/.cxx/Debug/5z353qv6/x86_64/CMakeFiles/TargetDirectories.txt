@@ -1,0 +1,2 @@
+C:/Users/sruth/AndroidStudioProjects/Attendance (3)/Attendance/android/app/.cxx/Debug/5z353qv6/x86_64/CMakeFiles/edit_cache.dir
+C:/Users/sruth/AndroidStudioProjects/Attendance (3)/Attendance/android/app/.cxx/Debug/5z353qv6/x86_64/CMakeFiles/rebuild_cache.dir

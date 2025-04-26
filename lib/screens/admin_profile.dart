@@ -19,11 +19,12 @@ import 'EditCourses.dart';
 import 'Edit_Sections.dart';
 import 'Edit_roll_numbers.dart';
 import 'Overall_attendance.dart';
-import 'Sending_message.dart';
+// import 'Sending_message.dart';
 import 'Timeslots.dart';
 import 'admin_home_Screen.dart';
 import 'admin_student_numbersearch.dart';
 import 'changepassword.dart';
+import 'datewise_attendace.dart';
 
 class AdminProfile extends StatefulWidget {
   const AdminProfile({super.key});
@@ -234,6 +235,24 @@ class _AdminProfileState extends State<AdminProfile> {
                                     color: Colors.black.withOpacity(0.2), // Set the color of the line
                                     margin: EdgeInsets.symmetric(vertical: 20), // Adjust the margin if needed
                                   ),],
+                                  if (role != 'admin') ...[
+                                    GestureDetector(
+                                      onTap: (){
+                                        Navigator.push(context, MaterialPageRoute(builder: (context){
+                                          return Date_wise_attendace();
+                                        }));
+                                      },
+                                      child: ListTile(
+                                        leading: Icon(Icons.login_rounded),
+                                        title: Text("Date Wise Attendace"),
+                                        trailing: Icon(Icons.arrow_forward_ios_sharp),
+                                      ),
+                                    ),
+                                    Container(
+                                      height: 1, // Adjust the height of the line
+                                      color: Colors.black.withOpacity(0.2), // Set the color of the line
+                                      margin: EdgeInsets.symmetric(vertical: 20), // Adjust the margin if needed
+                                    ),],
                                   if (role == 'HOD') ...[
                                   GestureDetector(
                                     onTap: (){

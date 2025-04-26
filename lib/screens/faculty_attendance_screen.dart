@@ -390,6 +390,31 @@ class _TopsectionState extends State<Topsection> {
                           'Academic_year':fetched_Academic_year,
                           'Entities':entities,
                         });
+                        // Update student_data_fire for each absentee
+                        for (String roll in absent_numbers) {
+                          final studentRef = FirebaseFirestore.instance.collection('student_data_fire').doc(roll);
+                          final studentSnap = await studentRef.get();
+
+                          if (studentSnap.exists) {
+                            final studentData = studentSnap.data() as Map<String, dynamic>;
+
+                            // Get current entity count for the course or set to 0
+                            int current = studentData[course_value] ?? 0;
+                            print(roll);
+                            print(current);
+                            print(entities);
+                            // Add new entities to existing value
+                            await studentRef.update({
+                              course_value: current + entities,
+                            });
+                          } else {
+                            // If doc doesn't exist, create it
+                            await studentRef.set({
+                              course_value: entities,
+                            });
+                          }
+                        }
+
                         final count = fulldata[deptvalue][yearvalue][sectionvalue]['courses_count'][course_value]['count'];
                         final entity_list = fulldata[deptvalue][yearvalue][sectionvalue]['courses_count'][course_value]['entity_list'];
                         if(!entity_list.contains(entities)){
